@@ -158,8 +158,8 @@ b4 <- Sys.time()
 KDE <- estSpaceUse(TD, scale=h, res=2.5, polyOut=T)
 Sys.time() - b4
 
-# saveRDS(KDE, "C:\\Users\\Martim Bill\\Documents\\mIBA_package\\data\\white_storks\\analysis\\KDE_h7.5.rds")
-KDE <- readRDS("C:\\Users\\Martim Bill\\Documents\\mIBA_package\\data\\white_storks\\analysis\\KDE_h7.5.rds")
+saveRDS(KDE, "manuscript_analysis/XXKDE_h7.5.rds")
+# KDE <- readRDS("C:\\Users\\Martim Bill\\Documents\\mIBA_package\\data\\white_storks\\analysis\\KDE_h7.5.rds")
 
 mapKDE(KDE$UDPolygons)
 
