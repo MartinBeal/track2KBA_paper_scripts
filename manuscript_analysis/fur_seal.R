@@ -8,15 +8,15 @@ pacman::p_load(dplyr, lubridate, sf, track2KBA, ggplot2)
 
 load("C:/Users/Martim Bill/Documents/mIBA_package/all_orig_dev_files/example_data/SG_Seal_FinalData4mIBA_V3.Rdata")
 
-ses <- subset(Data3, Data3$common_name=="SES")
-afs <- subset(Data3, Data3$common_name!="SES")
+# ses <- subset(Data3, Data3$common_name=="SES")
+afs <- subset(Data3, Data3$common_name!="SES") # just fur seals
 
-col1 <- subset(afs, afs$SpecificColony=="BirdIsl")
+col1 <- subset(afs, afs$SpecificColony=="BirdIsl") # just Bird Island data
 col2 <- subset(afs, afs$SpecificColony=="Husvik")
 
 ##########
 
-tracks <- col1
+tracks <- col1 # just Bird Island data
 # tracks <- col2
 
 ## filter to breeding stage only 
@@ -33,30 +33,44 @@ if(tracks$SpecificColony[1] == "Husvik"){
 }
 
 colony$Longitude <- as.numeric(colony$Longitude)
-colony$Latitude <- as.numeric(colony$Latitude)
+colony$Latitude  <- as.numeric(colony$Latitude)
 
 ######
-
-tracks_form <- formatFields(tracks, fieldID = "track_id", fieldLat="Latitude", fieldLon="Longitude", fieldDateTime="date", cleanDF = F)
+# Format for track2KBA
+tracks_form <- formatFields(
+  tracks, 
+  fieldID = "track_id", 
+  fieldLat="Latitude", 
+  fieldLon="Longitude", 
+  fieldDateTime="date", 
+  cleanDF = F
+  )
 str(tracks_form)
-### for a dataset with both date and time fields #####
-# tracks <- formatFields(tracks, field_id = "track_id", field_lat="latitude", field_lon="longitude", field_date="date_gmt", field_time="time_gmt")
 
 ######
 # filter to years with at least n (10) tracked individuals (rmv 1995)
 tracks_form$year <- year(tracks_form$DateTime)
-yr_n <- tracks_form %>% group_by(year) %>% summarise(n = n_distinct(ID))
+yr_n <- tracks_form %>% 
+  group_by(year) %>% 
+  summarise(n = n_distinct(ID))
 goodyrs <- yr_n %>% filter(n > 10)
 
 tracks_form <- tracks_form %>% filter(year %in% goodyrs$year)
 
 #####
-# source("tripSplit.R")
+## split into foraging trips
 
-allTrips <- tripSplit(tracks_form, colony=colony, innerBuff = 5, returnBuff = 50, duration=12, rmNonTrip = T)
+allTrips <- tripSplit(
+  tracks_form, 
+  colony=colony, 
+  innerBuff = 5, 
+  returnBuff = 50, 
+  duration=12, 
+  rmNonTrip = T
+  )
 
 ## check yearly sample sizes 
-allTrips@data %>% mutate(year =lubridate::year(DateTime)) %>% group_by(year) %>% summarise(N = n_distinct(ID))
+allTrips@data %>% mutate(year = lubridate::year(DateTime)) %>% group_by(year) %>% summarise(N = n_distinct(ID))
 
 # Tripmap <- mapTrips(allTrips, colony)
 Tripmap <- mapTrips(allTrips[allTrips$ID %in% unique(allTrips$ID)[35:46], ], colony)

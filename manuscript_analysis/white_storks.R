@@ -1,20 +1,6 @@
-## White Storks - Portugal ##
+## Analysis of White Storks migration data ##
 
 pacman::p_load(dplyr, lubridate, sf, track2KBA, ggplot2, ggmap, raster)
-
-
-# allTD <- read.csv("C:\\Users\\Martim Bill\\Documents\\mIBA_package\\data\\white_storks\\White Stork 2016_2019_9s_20200928\\White Stork 2016_2019_9s_20200928.csv")
-
-# migdates <- read.csv("C:\\Users\\Martim Bill\\Documents\\mIBA_package\\data\\white_storks\\all_migration_dates.csv")
-
-# filter to only migrant individuals
-# migTD <- allTD[allTD$individual.local.identifier %in% migdates$ID, ] %>% 
-#   dplyr::select(
-#   individual.local.identifier, Age, burst, timestamp, location.long, location.lat, Mean_ground.speed, Record_type, Year
-# ) %>% rename(ID = individual.local.identifier)
-
-# saveRDS(migTD, "C:\\Users\\Martim Bill\\Documents\\mIBA_package\\data\\white_storks\\migratory_storks.rds")
-
 
 ## Data from migrant birds only ## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -40,7 +26,6 @@ migTD <- migTD %>% left_join(migdates, by=c('ID'))
 # mapview::mapview(one)
 
 # filter to only birds with at least the first full autumn migration
-
 tracks <- migTD %>% filter(!is.na(end_autumn_1))
 
 # filter to only migratory periods
@@ -58,13 +43,6 @@ tracks <- tracks %>% mutate(
 ) %>% filter(
   filter == FALSE
 ) %>% dplyr::select(-filter)
-
-# summarise number of IDs with 1, 2, 3 migrations for autumn and spring
-# tracks %>% filter(!is.na(end_autumn_1)) %>% summarise(n_distinct(ID))
-# tracks %>% filter(!is.na(end_spring_1)) %>% summarise(n_distinct(ID))
-# tracks %>% filter(!is.na(end_autumn_2) & age != "juvenile") %>% summarise(n_distinct(ID))
-# tracks %>% filter(!is.na(end_spring_2) & age != "juvenile") %>% summarise(n_distinct(ID))
-
 
 ## rough downsample to speed things up ##
 # tracks <- tracks %>%
@@ -127,13 +105,24 @@ mean(lags$median.lag.)
 sd(lags$median.lag.)
 
 
-## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-## Track2KBA analysis ## 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## track2KBA analysis ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Format data 
-tracks <- formatFields(tracks, fieldID = "ID", fieldDateTime = "timestamp", fieldLat = "location.lat", fieldLon = "location.long")
+tracks <- formatFields(
+  tracks, 
+  fieldID = "ID", 
+  fieldDateTime = "timestamp", 
+  fieldLat = "location.lat", 
+  fieldLon = "location.long"
+  )
 
-yrsamps <- tracks %>% mutate(year=year(DateTime)) %>% group_by(year) %>% summarise(n_distinct(ID))
+## yearly sample sizes
+yrsamps <- tracks %>% 
+  mutate(year=year(DateTime)) %>% 
+  group_by(year) %>% 
+  summarise(n_distinct(ID))
 
 # tracks %>% st_as_sf(coords = c("Longitude","Latitude"), crs = 4326, agr = "constant") %>%
 #   mapview::mapview()
@@ -158,8 +147,8 @@ b4 <- Sys.time()
 KDE <- estSpaceUse(TD, scale=h, res=2.5, polyOut=T)
 Sys.time() - b4
 
-saveRDS(KDE, "manuscript_analysis/XXKDE_h7.5.rds")
-# KDE <- readRDS("C:\\Users\\Martim Bill\\Documents\\mIBA_package\\data\\white_storks\\analysis\\KDE_h7.5.rds")
+# saveRDS(KDE, "C:\\Users\\Martim Bill\\Documents\\mIBA_package\\data\\white_storks\\analysis\\KDE_h7.5.rds")
+KDE <- readRDS("C:\\Users\\Martim Bill\\Documents\\mIBA_package\\data\\white_storks\\analysis\\KDE_h7.5.rds")
 
 mapKDE(KDE$UDPolygons)
 
@@ -187,10 +176,8 @@ represent <- 95.7
 rm(KDE)
 rm(TD)
 
-# potSite <- findSite(KDE = KDE$KDE.Surface, represent = represent, popSize = 26200) # popSize based on calc. from 'estimate_pop_size' spreadsheet
+## find site
 potSite <- findSite(KDE = KDE, represent = represent, levelUD=50, popSize = 26200)
-
-# potSite <- findSite(KDE = KDE$KDE.Surface, represent = 96)
 
 # saveRDS(potSite, "C:\\Users\\Martim Bill\\Documents\\mIBA_package\\data\\white_storks\\analysis\\potSite_h7.5.rds")
 
@@ -205,7 +192,7 @@ potSite <- fullgrid[fullgrid$potentialSite == TRUE, ]
 bbox_poly <- as(extent(as.vector(t(bbox(potSite)))), "SpatialPolygons")
 proj4string(bbox_poly) <- proj4string(potSite)
 
-# Split spatially disparate areas into different sites # 
+## Split spatially disparate areas into different sites # 
 potSite <- brick(potSite)
 potSite <- crop(potSite, bbox_poly)
 potSite <- brick(addLayer(
@@ -313,4 +300,3 @@ site$area <- st_area(site) / 1000^2 # sq km
 plot(site %>% filter(N_animals>8000))
 
 potSite
-

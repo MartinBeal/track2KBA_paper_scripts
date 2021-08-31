@@ -18,16 +18,18 @@ bbox@proj4string <- CRS(SRS_string = "EPSG:4326")
 
 #####
 
-tracks_f <- tracks_f %>% rename(Argos.Location.Quality = Location.Quality, GPS.HDOP=HDOP) %>% mutate(
-  sensor = ifelse(Argos.Location.Quality == "", "GPS", "Argos doppler shift")
+tracks_f <- tracks_f %>% 
+  rename(Argos.Location.Quality = Location.Quality, GPS.HDOP=HDOP) %>% 
+  mutate(
+    sensor = ifelse(Argos.Location.Quality == "", "GPS", "Argos doppler shift")
 ) 
- 
+
 ## Remove PTT points of lowest quality  ~~~~~~~~~~~~~~~~~~~~~
 tracks_f <- tracks_f[!tracks_f$Argos.Location.Quality %in% c("Z","B","A"),]
 # tracks <- tracks[!tracks$Argos.Location.Quality %in% c("Z","B","A","0"),]
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-## Speed and inner angle filter for GPS data with SDLfilter ~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Speed and inner angle filter for GPS data with SDLfilter ~~~~~~~~~~~~~~~~~~~~
 
 gps <- tracks_f[tracks_f$sensor == "GPS", ]
 
@@ -41,49 +43,54 @@ vmax <- vmax(gps_nodups, qi=5, prob=0.98)    # maximum linear speed   # 9.0 km/h
 vmaxlp  <- vmaxlp(gps_nodups, qi=5, prob=0.98) # maximum 'loop-speed'
 
 gps_fltrd <- ddfilter(gps_nodups, vmax=vmax, vmaxlp = vmaxlp , qi=4, method=1)
-# gps_fltrd <- ddfilter.speed(gps_nodups, vmax=vmax, method=1)  # only speed filter
-# gps_fltrd <- ddfilter.loop(gps_nodups, maxvlp = maxvlp, qi=4)
 
-# gps_fltrdSP <- SpatialPointsDataFrame(SpatialPoints(data.frame(gps_fltrd$lon, gps_fltrd$lat), proj4string=CRS("+proj=longlat + datum=wgs84")), data=gps_fltrd) # foraging
-# gpsSP <- SpatialPointsDataFrame(SpatialPoints(data.frame(gps$lon, gps$lat), proj4string=CRS("+proj=longlat + datum=wgs84")), data=gps) # foraging
-# mapview::mapview(gps_fltrdSP) # compare filtered result to raw 
-# mapview::mapview(gpsSP)
-
-# table(gps$id) - table(gps_fltrd$id) # number of points rmvd per individual
-
-## View filtered points
-# anti_gps <- anti_join(gps, gps_fltrd)
-# anti_gpsSP <- SpatialPointsDataFrame(SpatialPoints(data.frame(anti_gps$lon, anti_gps$lat), proj4string=CRS("+proj=longlat + datum=wgs84")), data=anti_gps) # foraging
-# mapview::mapview(anti_gpsSP)
-
-gps_fltrd <- formatFields(gps_fltrd, fieldID = "id", fieldLat="lat", fieldLon="lon", fieldDateTime="DateTime") #%>% 
+## format for track2KBA ## 
+gps_fltrd <- formatFields(
+  gps_fltrd, 
+  fieldID = "id", 
+  fieldLat="lat", 
+  fieldLon="lon", 
+  fieldDateTime="DateTime") #%>% 
   #dplyr::select(-c(qi, pTime, sTime, pDist, sDist, pSpeed, sSpeed, inAng))
 
 ## Recombine filtered GPS data with PTT data
-tracks_f <- tracks_f %>% filter(sensor == "Argos doppler shift") %>% full_join(gps_fltrd, by=) %>% arrange(ID, DateTime)
+tracks_f <- tracks_f %>% 
+  filter(sensor == "Argos doppler shift") %>% 
+  full_join(gps_fltrd, by=) %>% 
+  arrange(ID, DateTime)
 
-fSP2 <- SpatialPointsDataFrame(SpatialPoints(data.frame(tracks_f$Longitude, tracks_f$Latitude), proj4string=CRS(SRS_string = "EPSG:4326")), data=tracks_f) # foraging
+fSP2 <- SpatialPointsDataFrame(
+  SpatialPoints(
+    data.frame(tracks_f$Longitude, tracks_f$Latitude), 
+    proj4string=CRS(SRS_string = "EPSG:4326")), 
+  data=tracks_f) # foraging
 
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ## track2KBA analysis ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+## project to custom-centered projection
 TD <- projectTracks(fSP2, projType = "azim", custom=T)
 
+## get smoothing parameter candidates 
 HVALS <- findScale(TD)
 HVALS
 
+## set smoothing parameter ##
 h <- HVALS$href
 h
 
+## estimate utilization distributions for each individual ##
 KDE <- estSpaceUse(TD, scale=h, polyOut=T, res = 1.5)
 # saveRDS(KDE, "C:\\Users\\Martim Bill\\Documents\\mIBA_package\\data\\green_turtles\\analysis\\KDE.rds")
 
+## save UDs ##
 n <- length(KDE$KDE.Surface)
 ggsave( paste0("C:/Users/Martim Bill/Documents/mIBA_package/figures/white_storks/indcores_", "h", round(h), "_", "n",n, ".png"), width = 8, height=6)
 
+## map ##
 # KDE <- readRDS("C:\\Users\\Martim Bill\\Documents\\mIBA_package\\data\\green_turtles\\analysis\\KDE.rds")
-
 KDEmap <- mapKDE(KDE$UDPolygons)
 
 n <- length(KDE$KDE)
@@ -92,15 +99,27 @@ n <- length(KDE$KDE)
 
 ## Assess representativeness ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # before <- Sys.time()
-# represent <- repAssess(TD, KDE$KDE.Surface, iteration=800, nCores=2, avgMethod = "mean", bootTable = T)
+represent <- repAssess(TD, 
+                       KDE$KDE.Surface,
+                       levelUD = 50,
+                       iteration=800, 
+                       nCores=2, 
+                       avgMethod = "mean", 
+                       bootTable = T)
 # Sys.time() - before
 # rep_value <- represent[[1]]$out
-rep_value <- 32.4
+# rep_value <- 32.4
 
-popsize <- 18573
+popsize <- 18573 # nesting population (females)
 
-aggs <- findSite(KDE=KDE$KDE.Surface, popSize = popsize, represent = rep_value, polyOut = T)
-# aggs <- findSite(KDE=KDE$KDE.Surface, represent = rep_value)
+## get number of overapping core areas in space
+aggs <- findSite(
+  KDE=KDE$KDE.Surface, 
+  popSize = popsize, 
+  represent = rep_value, 
+  polyOut = T, 
+  levelUD=50)
+
 # saveRDS(aggs, "C:\\Users\\Martim Bill\\Documents\\mIBA_package\\data\\green_turtles\\analysis\\Site.rds")
 
 # aggs <- readRDS("C:\\Users\\Martim Bill\\Documents\\mIBA_package\\data\\green_turtles\\analysis\\Site.rds")
