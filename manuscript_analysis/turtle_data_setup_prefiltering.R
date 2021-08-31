@@ -4,7 +4,7 @@
 pacman::p_load(track2KBA, dplyr, sp, stringr, SDLfilter)
 
 ## Data input ~~~~~~~~~~~~~~~~~~
-raw <- read.csv("data/tracks/green_turtles_all_nofilter_2018-19.csv")
+raw <- read.csv("data/green_turtles/green_turtles_all_nofilter_2018-19.csv")
 tracksum <- read.csv("C:/Users/Martim Bill/Documents/mIBA_package/data/green_turtles/summary_csv.csv", stringsAsFactors = F) # deployment summary 
 
 
